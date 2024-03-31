@@ -35,7 +35,6 @@ HASensorNumber rs485_commerrors("logarex_rs485communicationerrors", HASensorNumb
 //======================================================================================================================
 // Logarex stuff
 //======================================================================================================================
-void newDataAvailable();
 void newTelegramCallback(const char *key, const char *value);
 Logarex logarex(&Serial2, newTelegramCallback);
 TaskHandle_t logarexTask;
@@ -237,7 +236,7 @@ void setup() {
 
   ESP_LOGI(TAG, "HA device configured");
 
-  Serial.begin(115200);
+  // Serial.begin(115200);
   Serial2.begin(9600, SERIAL_8N1);
 
   xTaskCreatePinnedToCore(
