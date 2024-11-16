@@ -2,6 +2,8 @@ static const char* TAG = "main";
 #include <map>
 #include <string>
 #include <atomic>
+#include <WebServer.h>
+#include <ElegantOTA.h>
 #include <Arduino.h>
 #include <WiFi.h>
 #include <logarex.h>
@@ -18,16 +20,20 @@ static const char* TAG = "main";
 
 #define HOSTNAME "Logarex-Bridge"
 
+
+//======================================================================================================================
+// Networking
+//======================================================================================================================
+#define BROKER_ADDR IPAddress(192,168,188,4) 
+#define MQTT_PORT 1883
+WiFiClient client;
+WebServer server(80);
+
 //======================================================================================================================
 // HA Device Parameter
 //======================================================================================================================
-#define BROKER_ADDR IPAddress(192,168,188,4) // MQTT Broker Address
-// 192.168.188.4
-int mqtt_port = 1883;
-WiFiClient client;
 HADevice device("logarex");
 HAMqtt mqtt(client, device);
-
 HASensorNumber rs485_timeouts("logarex_rs485timeouts", HASensorNumber::PrecisionP0);
 HASensorNumber rs485_checksumerrors("logarex_rs485checksumerrors", HASensorNumber::PrecisionP0);
 HASensorNumber rs485_commerrors("logarex_rs485communicationerrors", HASensorNumber::PrecisionP0);
@@ -105,7 +111,7 @@ void setup_device(){
         "kWh",
         "energy", 
         "total_increasing", 
-        60000)},
+        15 * 60'000)},
     {"1-0:2.8.0*255", 
       new Telegram("logarex_energy2",
         "Energy 2", 
@@ -113,7 +119,7 @@ void setup_device(){
         "kWh",
         "energy", 
         "total_increasing", 
-        60000)},
+        15 * 60'000)},
     {"1-0:16.7.0*255", 
       new Telegram("logarex_power",
         "Power", 
@@ -121,7 +127,7 @@ void setup_device(){
         "W",
         "power", 
         "measurement", 
-        1000)},
+        5'000)},
     {"1-0:32.7.0*255", 
       new Telegram("logarex_voltageL1",
         "Voltage L1", 
@@ -129,7 +135,7 @@ void setup_device(){
         "V",
         "voltage", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:52.7.0*255", 
       new Telegram("logarex_voltageL2",
         "Voltage L2", 
@@ -137,7 +143,7 @@ void setup_device(){
         "V",
         "voltage", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:72.7.0*255", 
       new Telegram("logarex_voltageL3",
         "Voltage L3", 
@@ -145,7 +151,7 @@ void setup_device(){
         "V",
         "voltage", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:31.7.0*255", 
       new Telegram("logarex_currentL1",
         "Current L1", 
@@ -153,7 +159,7 @@ void setup_device(){
         "A",
         "current", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:51.7.0*255", 
       new Telegram("logarex_currentL2",
         "Current L2", 
@@ -161,7 +167,7 @@ void setup_device(){
         "A",
         "current", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:71.7.0*255", 
       new Telegram("logarex_currentL3",
         "Current L3", 
@@ -169,7 +175,7 @@ void setup_device(){
         "A",
         "current", 
         "measurement", 
-        1000)},
+        5 * 60'000)},
     {"1-0:81.7.1*255", 
       new Telegram("logarex_phaseangleUL2UL1",
         "Phase angle UL2:UL1", 
@@ -177,7 +183,7 @@ void setup_device(){
         "°",
         "None", 
         "measurement", 
-        360000)},
+        15 * 60'000)},
     {"1-0:81.7.2*255", 
       new Telegram("logarex_phaseangleUL3UL1",
         "Phase angle UL3:UL1", 
@@ -185,7 +191,7 @@ void setup_device(){
         "°",
         "None", 
         "measurement", 
-        360000)},
+        15 * 60'000)},
     {"1-0:81.7.4*255", 
       new Telegram("logarex_phaseangleIL1UL1",
         "Phase angle IL1:UL1", 
@@ -193,7 +199,7 @@ void setup_device(){
         "°",
         "None", 
         "measurement", 
-        360000)},
+        15 * 60'000)},
     {"1-0:81.7.15*255", 
       new Telegram("logarex_phaseangleIL2UL2",
         "Phase angle IL2:UL2", 
@@ -201,7 +207,7 @@ void setup_device(){
         "°",
         "None", 
         "measurement", 
-        360000)},
+        15 * 60'000)},
     {"1-0:81.7.26*255", 
       new Telegram("logarex_phaseangleIL3UL3",
         "Phase angle IL3:UL3", 
@@ -209,7 +215,7 @@ void setup_device(){
         "°",
         "None", 
         "measurement", 
-        360000)},
+        15 * 60'000)},
     {"1-0:14.7.0*255", 
       new Telegram("logarex_supplyfrequency",
         "Supply frequency", 
@@ -217,12 +223,12 @@ void setup_device(){
         "Hz",
         "frequency", 
         "measurement", 
-        60000)},
+        15 * 60'000)},
   };
 }
 
 void setup_mqtt(){
-  mqtt.begin(BROKER_ADDR, mqtt_port, MQTT_USER, MQTT_PASSWORD);
+  mqtt.begin(BROKER_ADDR, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 }
 
 void setup() {
@@ -257,6 +263,14 @@ void setup() {
   setup_mqtt();
   ESP_LOGI(TAG, "MQTT started");
 
+  server.on("/", []() {
+    server.send(200, "text/plain", "Rags' Logarex Bridge Webserver for OTA.");
+  });
+  ElegantOTA.begin(&server);
+  server.begin();
+  Serial.println("HTTP server started");
+  ESP_LOGI(TAG, "OTA server started");
+
   logarex.start();
   ESP_LOGI(TAG, "RS485 communication started");
 
@@ -267,45 +281,17 @@ void setup() {
 
 
 void loop() {
+  server.handleClient();
+  ElegantOTA.loop();
   mqtt.loop();
-  // if (Serial.available() >= 2) {
-  //   byte first = Serial.read();
-  //   byte second = Serial.read();
-
-  //   if (first == 'q' && second == 'u') {
-  //     logarex.addToDelaySendQuery(10);
-  //   }
-  //   if (first == 'q' && second == 'd') {
-  //     logarex.addToDelaySendQuery(-10);
-  //   }
-  //   if (first == 'a' && second == 'u') {
-  //     logarex.addToDelaySendACK(10);
-  //   }
-  //   if (first == 'a' && second == 'd') {
-  //     logarex.addToDelaySendACK(-10);
-  //   }
-  //   if (first == 't' && second == 'u') {
-  //     logarex.addToTimeout(100);
-  //   }
-  //   if (first == 't' && second == 'd') {
-  //     logarex.addToTimeout(-100);
-  //   }
-
-  //   // empty buffer
-  //   while (Serial.available()) {
-  //     Serial.read();
-  //   }
-  // }
+  
+  rs485_checksumerrors.setValue((u_int32_t)logarex.countChecksumErrors());
+  rs485_commerrors.setValue((u_int32_t)logarex.countProtocolErrors());
+  rs485_timeouts.setValue((u_int32_t)logarex.countTimeouts());
+    
   if (logarex.isValidDataReceived()) {
-    rs485_checksumerrors.setValue((u_int32_t)logarex.countChecksumErrors());
-    rs485_commerrors.setValue((u_int32_t)logarex.countProtocolErrors());
-    rs485_timeouts.setValue((u_int32_t)logarex.countTimeouts());
     for (const auto& kv : telegrams) {
       kv.second->publish();
     }
-    delay(10);
-  } else {
-    ESP_LOGD(TAG, "Waiting for first successful read");
-    delay(1000);
   }
 }

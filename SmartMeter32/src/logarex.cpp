@@ -3,7 +3,8 @@ static const char* TAG = "logarex";
 #include "logarex.h"
 
 #define DELAY_SEND_MILLIS 75
-#define TIMEOUT_MILLIS 2000
+#define TIMEOUT_MILLIS 4'000
+#define DELAY_AFTER_FULL_READ 2'000
 
 Logarex::Logarex(Stream *port, new_telegram_function_t callback) {
   this->port = port;
@@ -318,13 +319,13 @@ void Logarex::loop() {
       ESP_LOGI(TAG, "Dataset successfully reveiced");
       state = SEND_REQUEST;
       bcc = 0;
-
-      // TODO Handle whole dataset
       validDataReceived = true;
     } else {
       ESP_LOGV(TAG, "Set state to CHECKSUM_ERROR");
       state = CHECKSUM_ERROR;
     }
+    delay(DELAY_AFTER_FULL_READ);
+    validDataReceived = false;
     break;
   
   case CHECKSUM_ERROR:
